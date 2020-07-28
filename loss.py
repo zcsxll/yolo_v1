@@ -97,7 +97,13 @@ class YoloLoss(torch.nn.Module):
         box_pred_response = box_pred[coo_response_mask].view(-1, 5).cuda() #如果target是3个bbox，则这里是box_pred_response的shape是[3, 5]
         box_target_response = box_target[coo_response_mask].view(-1, 5).cuda()
         box_target_response_iou = box_target_iou[coo_response_mask].view(-1, 5).cuda()
-        contain_loss = torch.nn.MSELoss(reduction='sum')(box_pred_response[:, 4], box_target_response_iou[:, 4]) #预测框的C和IOU(预测框，目标框)做MSE，而不是与1做MSE，为啥呢
+        '''
+        下边一行计算预测框的C和目标框的C的MSE，但并不是直接用预测框的C和1做MSE
+        个人理解：直接和1做MSE会有问题，因为如果IOU很小，就不能让C的target是1，即此时目标置信度不能是1，而是和此时的IOU有关，此时IOU很小，就不能说C是1，即不能说这个bbox含有物体
+        根据yolo论文，是和Pr(obj)∗IOU计算MSE的，这里乘了一个IOU；而Pr(obj)的值只能是0或1，所以真实置信度要么是IOU，要么是0
+        因此最后就是和IOU做MSE
+        '''
+        contain_loss = torch.nn.MSELoss(reduction='sum')(box_pred_response[:, 4], box_target_response_iou[:, 4])
         loc_loss = torch.nn.MSELoss(reduction='sum')(box_pred_response[:, :2], box_target_response[:, :2]) + torch.nn.MSELoss(reduction='sum')(torch.sqrt(box_pred_response[:, 2:4]), torch.sqrt(box_target_response[:, 2:4]))
 
         box_pred_not_response = box_pred[coo_not_response_mask].view(-1, 5)
