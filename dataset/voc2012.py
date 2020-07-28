@@ -260,7 +260,7 @@ if __name__ == '__main__':
     for idx, (img, target) in enumerate(dataloader):
         print(idx, img.shape, target.shape)
         # print(target[0, 6, 4, :])
-        np.savez('z.npz', img=img.cpu().detach().numpy(), target=target.cpu().detach().numpy())
+        np.savez('img_target.npz', img=img.cpu().detach().numpy(), target=target.cpu().detach().numpy())
         break
 
     #acbd75e74e6c4b4d65e60b9ec3f3adc6
