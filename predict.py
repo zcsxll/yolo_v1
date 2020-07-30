@@ -77,7 +77,51 @@ def decoder(pred):
                         class_indexs.append(int(class_index.cpu().detach().numpy()))
                         probs.append(float((contain_prob * max_prob).cpu().detach().numpy()))
     # print(boxes)
-    return boxes, class_indexs, probs
+    return np.array(boxes), np.array(class_indexs), np.array(probs)
+
+def nms(bboxes, scores, threshold=0.5):
+    '''
+    bboxes(tensor) [N,4]
+    scores(tensor) [N,]
+    '''
+    x1 = bboxes[:, 0]
+    y1 = bboxes[:, 1]
+    x2 = bboxes[:, 2]
+    y2 = bboxes[:, 3]
+    areas = (x2 - x1) * (y2 - y1)
+
+    order = np.argsort(scores)
+    order = list(order)
+    order.reverse()
+    keep = []
+    while len(order) > 0:
+        i = order[0]
+        keep.append(i)
+
+        if len(order) == 1:
+            break
+
+        xx1 = x1[order[1:]].clip(min=x1[i]) #以下四行是获取其他bbox和当前置信度最大bbox的交叠部分的左上右下点
+        yy1 = y1[order[1:]].clip(min=y1[i])
+        xx2 = x2[order[1:]].clip(max=x2[i])
+        yy2 = y2[order[1:]].clip(max=y2[i])
+        w = (xx2 - xx1).clip(min=0)
+        h = (yy2 - yy1).clip(min=0)
+        inter = w * h #其他bbox和当前置信度最大bbox的交叠部分的面积
+
+        iou = inter / (areas[i] + areas[order[1:]] - inter)
+        ids = (iou <= threshold) #如果ids[2] 是False，说明order[2+1]里存储的bbox和最高置信度bbox的iou很大，需要干掉；注意这里是2+1，因为ids不包含最大置信度bbox本身和自己的iou结果
+        if ids.sum() == 0:
+            break
+        # order = order[1:][ids] #第一个脚标不要了
+        tmp = []
+        for i, r in enumerate(ids):
+            if r == True:
+                tmp.append(order[i+1])
+        order = np.array(tmp)
+        # print(order)
+    # print(keep)
+    return keep
 
 def predict(model, img_path):
     img = cv2.imread(img_path)
@@ -92,7 +136,10 @@ def predict(model, img_path):
 
     pred = model(img).cpu().squeeze()
     # print(pred.shape)
-    return decoder(pred)
+    boxes, class_indexs, probs = decoder(pred)
+
+    keep = nms(boxes, probs)
+    return boxes[keep], class_indexs[keep], probs[keep]
 
 if __name__ == '__main__':
     model = create_model('resnet50')()
@@ -124,10 +171,11 @@ if __name__ == '__main__':
         left_up = (int(box[0]*w), int(box[1]*h))
         right_bottom = (int(box[2]*w), int(box[3]*h))
         cv2.rectangle(img, left_up, right_bottom, color, 2)
-        # label = class_name+str(round(prob,2))
-        # text_size, baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)
-        # p1 = (left_up[0], left_up[1]- text_size[1])
-        # cv2.rectangle(image, (p1[0] - 2//2, p1[1] - 2 - baseline), (p1[0] + text_size[0], p1[1] + text_size[1]), color, -1)
-        # cv2.putText(image, label, (p1[0], p1[1] + baseline), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255), 1, 8)
+
+        label = VOC_CLASSES[class_index] + ' %.2f' % prob
+        text_size, baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)
+        p1 = (left_up[0], left_up[1]- text_size[1])
+        cv2.rectangle(img, (p1[0]-2//2, p1[1]-2-baseline), (p1[0]+text_size[0], p1[1]+text_size[1]), color, -1)
+        cv2.putText(img, label, (p1[0], p1[1]+baseline), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, 8)
 
     cv2.imwrite('result.jpg', img)
