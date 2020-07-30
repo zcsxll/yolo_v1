@@ -1,2 +1,2 @@
 # yolo_v1
-for learning YOLO v1
+YOLO v1 pytorch
