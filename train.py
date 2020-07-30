@@ -26,7 +26,7 @@ if __name__ == '__main__':
     # print(transforms)
     # print(type(transforms.ToTensor()))
     # print(torch.nn.Module)
-    dataset = create_dataset('voc2012')(transform=[transforms.ToTensor()])
+    dataset = create_dataset('voc2007_2012')(transform=[transforms.ToTensor()])
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=24, shuffle=True, num_workers=24)
 
     yloss = YoloLoss(5, 0.5).cuda()
