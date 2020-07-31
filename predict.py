@@ -146,7 +146,7 @@ if __name__ == '__main__':
     model = model.cuda()
     model.eval()
 
-    state_dict_ok = torch.load('./yolo_v1_epoch40.pth')
+    state_dict_ok = torch.load('./yolo_v1_epoch50.pth')
     # state_dict_ok = torch.load('./yolo.pth')
     state_dict = model.state_dict()
     for key, val in state_dict_ok.items():

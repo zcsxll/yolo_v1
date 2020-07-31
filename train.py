@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import torch
 import torchvision.transforms as transforms
 
@@ -29,8 +30,12 @@ if __name__ == '__main__':
     dataset = create_dataset('voc2007_2012')(transform=[transforms.ToTensor()])
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=24, shuffle=True, num_workers=24)
 
+    dataset_test = create_dataset('voc2007test')(transform=[transforms.ToTensor()], train=False)
+    dataloader_test = torch.utils.data.DataLoader(dataset, batch_size=24, shuffle=False, num_workers=24)
+
     yloss = YoloLoss(5, 0.5).cuda()
 
+    best_test_loss = np.inf
     num_epochs = 50
     for epoch in range(num_epochs):
         model.train()
@@ -61,12 +66,25 @@ if __name__ == '__main__':
             loss.backward()
             optimizer.step()
 
-            if (idx + 1) % 5 == 0:
+            if (idx + 1) % 20 == 0:
                 print ('Epoch [%d/%d], Iter [%d/%d] Loss: %.4f, average_loss: %.4f' 
                     %(epoch + 1, num_epochs, idx + 1, len(dataloader), loss.cpu().detach().numpy(), total_loss / (idx + 1)))
                 # vis.plot_train_val(loss_train=total_loss/(i+1))
             # print(pred.shape)
         torch.save(model.state_dict(), 'yolo_v1_epoch%d.pth' % (epoch + 1))
 
-        #     break
-        # break
+        validation_loss = 0.0
+        model.eval()
+        for idx, (img, target) in enumerate(dataloader_test):
+            img, target = img.cuda(), target.cuda()
+
+            pred = model(img)
+            loss = yloss(pred, target)
+            validation_loss += loss.cpu().detach().numpy()
+        validation_loss /= len(dataloader_test)
+        # vis.plot_train_val(loss_val=validation_loss)
+        
+        if best_test_loss > validation_loss:
+            best_test_loss = validation_loss
+            print('get best test loss %.5f' % best_test_loss)
+            torch.save(model.state_dict(), 'yolo_v1_best.pth')
